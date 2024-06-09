@@ -108,10 +108,12 @@ impl<T: PartialOrd, const S: usize> MinSmallVec<T, S> {
         self.inner.push(value);
         let pushed = unsafe { self.inner.last().unwrap_unchecked() };
 
-        // recalculate the minimum value with a simple comparison
-        if !self.get_min().is_some_and(|min| min <= pushed) {
+        // if len was 0 (now 1 due to pushing),
+        // then self.min was `None` due to there being no elements
+        if (self.inner.len() == 1) || self.get_min().is_some_and(|min| pushed < min) {
             self.min = Some(pushed.into());
         }
+        // else the min value is `None` due to a partial_cmp call returning `None`
     }
 }
 
