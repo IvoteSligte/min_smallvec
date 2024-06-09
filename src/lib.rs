@@ -42,6 +42,18 @@ fn slice_min<T: PartialOrd>(slice: &[T]) -> Option<NonNull<T>> {
         .map(|refer: &T| refer.into())
 }
 
+fn partial_min<T: PartialOrd>(lhs: &T, rhs: &T) -> Option<NonNull<T>> {
+    let ord = lhs.partial_cmp(rhs)?;
+
+    Some(
+        match ord {
+            std::cmp::Ordering::Greater => rhs,
+            _ => lhs,
+        }
+        .into(),
+    )
+}
+
 impl<T: PartialOrd, const S: usize> MinSmallVec<T, S> {
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
@@ -75,6 +87,20 @@ impl<T: PartialOrd, const S: usize> MinSmallVec<T, S> {
     pub fn modify(&mut self, mut func: impl FnMut(&mut SmallVec<[T; S]>)) {
         func(&mut self.inner);
         self.min = slice_min(&self.inner);
+    }
+
+    /// Modifies a single element. This is cheaper than using [MinSmallVec::modify]
+    /// if the modified element is not equal to the minimum value.
+    pub fn modify_single(&mut self, index: usize, mut func: impl FnMut(&mut T)) {
+        let min = self.get_min().unwrap();
+        let was_min = min == &self.inner[index];
+        func(&mut self.inner[index]);
+
+        if was_min {
+            self.min = slice_min(&self.inner);
+        } else {
+            self.min = partial_min(self.get_min().unwrap(), &self.inner[index]);
+        }
     }
 
     /// Pushes a value. This is faster than using [MinBucket::modify]
