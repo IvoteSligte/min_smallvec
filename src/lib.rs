@@ -1,3 +1,6 @@
+//! # Min SmallVec
+//! A collection that knows its own minimum value.
+
 use std::ptr::NonNull;
 
 use smallvec::SmallVec;
@@ -6,8 +9,19 @@ use smallvec::SmallVec;
 ///
 /// Comparisons and equality on the type are delegated to comparisons and equality
 /// on the minimum value.
+///
+/// This allows one to create a tree of [MinSmallVec]s like so:
+/// ```rust
+/// struct MinTree<
+///     T: PartialOrd,
+///     const OS: usize, // outer size
+///     const IS: usize, // inner size
+/// >(MinSmallVec<MinSmallVec<T, IS>, OS>);
+/// ```
+///
+/// which reduces the cost of computing the minimum value logarithmically.
 #[derive(Debug)]
-pub struct MinBucket<T: PartialOrd, const S: usize> {
+pub struct MinSmallVec<T: PartialOrd, const S: usize> {
     inner: SmallVec<[T; S]>,
     /// Min value of the contained array is [None] if the array is empty
     /// or [PartialOrd::partial_cmp] has returned [None]
@@ -28,7 +42,7 @@ fn slice_min<T: PartialOrd>(slice: &[T]) -> Option<NonNull<T>> {
         .map(|refer: &T| refer.into())
 }
 
-impl<T: Ord, const S: usize> MinBucket<T, S> {
+impl<T: Ord, const S: usize> MinSmallVec<T, S> {
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             inner: SmallVec::with_capacity(capacity),
@@ -50,6 +64,7 @@ impl<T: Ord, const S: usize> MinBucket<T, S> {
         }
     }
 
+    /// Get a reference to the minimum value.
     pub fn get_min(&self) -> Option<&T> {
         // SAFETY: min always points to a value in self
         self.min.map(|ptr| unsafe { ptr.as_ref() })
@@ -74,7 +89,7 @@ impl<T: Ord, const S: usize> MinBucket<T, S> {
     }
 }
 
-impl<T: Ord, const S: usize> Default for MinBucket<T, S> {
+impl<T: Ord, const S: usize> Default for MinSmallVec<T, S> {
     fn default() -> Self {
         Self {
             inner: SmallVec::default(),
@@ -83,21 +98,21 @@ impl<T: Ord, const S: usize> Default for MinBucket<T, S> {
     }
 }
 
-impl<T: Ord, const S: usize> PartialOrd for MinBucket<T, S> {
+impl<T: Ord, const S: usize> PartialOrd for MinSmallVec<T, S> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.get_min().zip(other.get_min()).map(|(s, o)| s.cmp(o))
     }
 }
 
-impl<T: Ord + Eq, const S: usize> PartialEq for MinBucket<T, S> {
+impl<T: Ord + Eq, const S: usize> PartialEq for MinSmallVec<T, S> {
     fn eq(&self, other: &Self) -> bool {
         self.get_min().eq(&other.get_min())
     }
 }
 
-impl<T: Ord + Eq, const S: usize> Eq for MinBucket<T, S> {}
+impl<T: Ord + Eq, const S: usize> Eq for MinSmallVec<T, S> {}
 
-impl<T: Ord + Eq, const S: usize> FromIterator<T> for MinBucket<T, S> {
+impl<T: Ord + Eq, const S: usize> FromIterator<T> for MinSmallVec<T, S> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         let inner = SmallVec::from_iter(iter);
 
